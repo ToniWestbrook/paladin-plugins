@@ -61,7 +61,7 @@ Group flattened kingdoms (child ranks of domains [level 1]) to one file, group a
 paladin-plugins @@taxonomy -i input.tsv -q 30 -t children -l 1 @@write first.txt @@taxonomy -i input.tsv -q 30 -t species -l 0 @@write second.txt @@plotting -s 20 15 -g 1 2 @@plotting -i first.txt -l 10 -c 0 0 @@plotting -i second.txt -l 10 -c 0 1 -o chart.png
 ```
 
-Download a custom UniProt report with organism, protein names, go terms, comments, and kegg cross reference for fields.
+Download a custom UniProt report with organism, protein names, go terms, comments, and kegg cross reference for fields. The full list of available fields and database cross-references can be found [here](http://www.uniprot.org/help/query-fields): 
 ```
 paladin-plugins @@uniprot -i input.sam -c Organism "protein names" go comments "database(KEGG)"
 ```
