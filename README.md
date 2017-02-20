@@ -77,4 +77,4 @@ The HPC plugin may be used to distribute a PALADIN execution across multiple clu
 mpirun paladin-plugins.py @@hpc reference.fasta.gz reads.fq.gz output -t 24 -P http://proxy:3128
 ```
 
-Note, usage of the HPC plugin may display an error if not running in an MPI aware environment.  
+Note, usage of the HPC plugin may terminate with an error if not running in an MPI aware environment.  
