@@ -1,4 +1,4 @@
-# paladin-plugins
+# PALADIN-plugins
 Pipeline plugins for PALADIN, providing HPC support, abundance (taxonomy, go terms), automation, etc.
 
 PALADIN-plugins can be chained in a pipeline configuration using a single or multiple execution runs to process PALADIN related data through multiple stages of analysis.  Included plugins are as follows:
