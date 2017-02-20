@@ -63,7 +63,7 @@ paladin-plugins @@taxonomy -i input.tsv -q 30 -t children -l 1 @@write first.txt
 
 HPC Plugin
 --
-The HPC plugin may be used to distribute a PALADIN execution across multiple cluster nodes.  It is used in conjunction with mpirun and the appropriate submission system batch script. Below is an example Slurm batch script for splitting a PALADIN execution across 10 nodes, using 24 threads per node, and routing any communication with uniprot.org through a central proxy server on port 3128:
+The HPC plugin may be used to distribute a PALADIN execution across multiple cluster nodes.  It is used in conjunction with mpirun and the appropriate batch submission script. Below is an example Slurm batch script for splitting a PALADIN execution across 10 nodes, using 24 threads per node, and routing any communication with uniprot.org through a central proxy server on port 3128:
 
 ```
 #!/bin/bash
