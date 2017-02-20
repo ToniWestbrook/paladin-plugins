@@ -1,0 +1,42 @@
+#! /usr/bin/env python3
+
+'''
+PALADIN plugin template.  
+
+All output (both stdout and stderr) must be routed through
+the "plugins.core.sendOutput" method.  Initialization and main program body should be stored
+within the initialization and main callbacks, respectively (see below).  
+
+plugins.core.PaladinEntry.getEntries can be used for getting UniProt report data
+plugins.core.SamEntry.getEntries can be used for getting SAM data
+
+See core.py for other API methods.  When calling methods from other plugins, be sure to list
+them as dependencies in the plugin definition.  Do not list core as a dependency.
+
+'''
+
+import argparse
+import shlex
+import plugins.core
+
+# Plugin connection definition
+def pluginConnect(passDefinition):
+    passDefinition.name = "pluginName" # Plugin name shown in plugin list (should match filename so user knows what to type eg @@pluginName) 
+    passDefinition.description = "Plugin Description" # Plugin description shown in  plugin list
+    passDefinition.versionMajor = 1 # Plugin version shown in plugin list
+    passDefinition.versionMinor = 0
+    passDefinition.versionRevision = 0
+    passDefinition.dependencies=['aggregation'] # If plugin depends on other plugins, specify their plugin ID here
+
+    #passDefinition.callbackInit = templateInit # Reference plugin initialization method here (run once at startup).  Not required.
+    passDefinition.callbackMain = templateMain # Reference plugin main method here.  Will receive plugin arguments.  Required.
+
+# Plugin main    
+def templateMain(passArguments):
+    # Parse arguments 
+    argParser = argparse.ArgumentParser(description='PALADIN Pipeline Plugins: Your plugin', prog='your plugin')
+    argParser.add_argument('-a', metavar='ARG1', type=str, help='Arg 1')
+    argParser.add_argument('-b', metavar='ARG2', type=int, required=True, help='Arg 2')
+    arguments = argParser.parse_known_args(shlex.split(passArguments))
+
+    plugins.core.sendOutput('Unimplemented', 'stderr')
