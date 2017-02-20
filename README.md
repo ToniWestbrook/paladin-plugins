@@ -12,6 +12,7 @@ PALADIN-plugins can be chained in a pipeline configuration using a single or mul
 - Plotting: Generate plots in PNG format from pipeline generated data
 - Taxonomy: Perform taxonomic grouping and abundance reporting
 - Uniprot: Download custom UniProt reports for a PALADIN prepared SAM alignment
+- Internal Commands: Flush, Write (screen and file output)
 
 INSTALLATION
 --
@@ -32,3 +33,23 @@ List available plugins.
 ```
 paladin-plugins -l
 ```
+
+Run PALADIN on all fastq (fq) files in a subdirectory that have "R1" in the filename using 16 threads, placing the output in each subdirectory:
+```
+paladin-plugins @@automate reference.fasta.gz /path/subdir .*R1.*\.fq.gz -t 16 -o outfile
+```
+
+Aggregate GO terms and write abundances to a file, filtering for a mapping quality of 20
+```
+paladin-plugins @@go -i input.tsv -q 20 @@write output.txt
+```
+
+Aggregate all bacterial species and write abundances to a file, then plot data to a pie chart, filtering for a mapping quality of 30 and limited number of values shown on graph to 10
+```
+paladin-plugins @@taxonomy -i input.tsv -q 30 -t species -r Bacteria @@write taxonomy.txt @@plotting -i taxonomy.txt -o chart.png -l 10 -L "My Chart" "My X-Axis", "My Y-Axis" -p -s 20 20
+```
+Aggregate flattened kingdoms (child ranks of domains [level 1]) to one file, aggregate all species to second file, then show both chart side-by-side in a single PNG:
+```
+paladin-plugins @@taxonomy -i input.tsv -q 30 -t children -l 1 @@write first.txt @@taxonomy -i input.tsv -q 30 -t species -l 0 @@write second.txt @@plotting -s 25 25 -g 1 2 @@plotting -i first.txt -l 10 -c 0 0 @@plotting -i second.txt -l 10 -c 0 1 -o chart.png
+```
+
