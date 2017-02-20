@@ -22,7 +22,7 @@ INSTALLATION
 
 - PALADIN
 - Python 3
-- Python libraries: matplotlib, mpi4pyi, numpy, requests
+- Python modules: matplotlib, mpi4pyi, numpy, requests
 
 ```
 git clone https://github.com/twestbrookunh/paladin-plugins.git
