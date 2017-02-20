@@ -61,6 +61,11 @@ Group flattened kingdoms (child ranks of domains [level 1]) to one file, group a
 paladin-plugins @@taxonomy -i input.tsv -q 30 -t children -l 1 @@write first.txt @@taxonomy -i input.tsv -q 30 -t species -l 0 @@write second.txt @@plotting -s 20 15 -g 1 2 @@plotting -i first.txt -l 10 -c 0 0 @@plotting -i second.txt -l 10 -c 0 1 -o chart.png
 ```
 
+Download a custom UniProt report with organism, protein names, go terms, comments, and kegg cross reference for fields.
+```
+paladin-plugins @@uniprot -i input.sam -c Organism "protein names" go comments "database(KEGG)"
+```
+
 HPC Plugin
 --
 The HPC plugin may be used to distribute a PALADIN execution across multiple cluster nodes.  It is used in conjunction with mpirun and the appropriate batch submission script. Below is an example Slurm batch script for splitting a PALADIN execution across 10 nodes, using 24 threads per node, and routing any communication with uniprot.org through a central proxy server on port 3128:
