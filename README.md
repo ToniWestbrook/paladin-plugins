@@ -9,7 +9,7 @@ PALADIN-plugins can be chained in a pipeline configuration using a single or mul
 - Difference: Analyze relative differences between two PALADIN taxonomy reports.  Can also report specific contributing reads for each difference
 - GO: Perform gene ontology term grouping and abundance reporting
 - HPC: Distribute PALADIN execution across cluster nodes
-- Plotting: Generate plots in PNG format from pipeline generated data
+- Plotting: Generate plots in PNG format from pipeline generated data (this feature is currently alpha)
 - Taxonomy: Perform taxonomic grouping and abundance reporting
 - Uniprot: Download custom UniProt reports for a PALADIN prepared SAM alignment
 - Internal Commands: Flush, Write (screen and file output)
