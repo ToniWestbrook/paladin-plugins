@@ -51,11 +51,30 @@ paladin-plugins @@go -i input.tsv -q 20 @@write output.txt
 ```
 
 Group all bacterial species and write abundances to a file, then plot data to a pie chart, filtering for a mapping quality of 30 and limited number of values shown on graph to 10
+
 ```
 paladin-plugins @@taxonomy -i input.tsv -q 30 -t species -r Bacteria @@write taxonomy.txt @@plotting -i taxonomy.txt -o chart.png -l 10 -L "My Chart" "My X-Axis", "My Y-Axis" -p -s 12 12
 ```
+
 Group flattened kingdoms (child ranks of domains [level 1]) to one file, group all species to second file, then show both charts side-by-side in a single PNG:
 ```
 paladin-plugins @@taxonomy -i input.tsv -q 30 -t children -l 1 @@write first.txt @@taxonomy -i input.tsv -q 30 -t species -l 0 @@write second.txt @@plotting -s 20 15 -g 1 2 @@plotting -i first.txt -l 10 -c 0 0 @@plotting -i second.txt -l 10 -c 0 1 -o chart.png
 ```
 
+HPC Plugin
+--
+The HPC plugin may be used to distribute a PALADIN execution across multiple cluster nodes.  It is used in conjunction with mpirun and the appropriate submission system batch script. Below is an example Slurm batch script for splitting a PALADIN execution across 10 nodes, using 24 threads per node, and routing any communication with uniprot.org through a central proxy server on port 3128:
+
+```
+#!/bin/bash
+
+#SBATCH -p hcgs
+#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks=10
+#SBATCH --job-name="PALADIN run"
+#SBATCH --output=running.log
+
+mpirun paladin-plugins.py @@hpc reference.fasta.gz reads.fq.gz output -t 24 -P http://proxy:3128
+```
+
+Note, usage of the HPC plugin may display an error if not running in an MPI aware environment.  
