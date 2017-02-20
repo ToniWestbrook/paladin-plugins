@@ -26,7 +26,7 @@ def pluginConnect(passDefinition):
     passDefinition.versionMajor = 1 # Plugin version shown in plugin list
     passDefinition.versionMinor = 0
     passDefinition.versionRevision = 0
-    passDefinition.dependencies=['aggregation'] # If plugin depends on other plugins, specify their plugin ID here
+    passDefinition.dependencies=['aggregation'] # If plugin depends on other plugins, specify their plugin name here
 
     #passDefinition.callbackInit = templateInit # Reference plugin initialization method here (run once at startup).  Not required.
     passDefinition.callbackMain = templateMain # Reference plugin main method here.  Will receive plugin arguments.  Required.
