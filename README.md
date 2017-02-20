@@ -46,7 +46,7 @@ paladin-plugins @@go -i input.tsv -q 20 @@write output.txt
 
 Aggregate all bacterial species and write abundances to a file, then plot data to a pie chart, filtering for a mapping quality of 30 and limited number of values shown on graph to 10
 ```
-paladin-plugins @@taxonomy -i input.tsv -q 30 -t species -r Bacteria @@write taxonomy.txt @@plotting -i taxonomy.txt -o chart.png -l 10 -L "My Chart" "My X-Axis", "My Y-Axis" -p -s 20 20
+paladin-plugins @@taxonomy -i input.tsv -q 30 -t species -r Bacteria @@write taxonomy.txt @@plotting -i taxonomy.txt -o chart.png -l 10 -L "My Chart" "My X-Axis", "My Y-Axis" -p -s 15 15
 ```
 Aggregate flattened kingdoms (child ranks of domains [level 1]) to one file, aggregate all species to second file, then show both chart side-by-side in a single PNG:
 ```
