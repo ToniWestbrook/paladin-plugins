@@ -36,7 +36,7 @@ import plugins.core
 # Plugin connection definition
 def pluginConnect(passDefinition):
     passDefinition.name = "difference"
-    passDefinition.description = "Analyze difference between two PALADIN alignemnts"
+    passDefinition.description = "Analyze relative differences between two PALADIN taxonomy reports"
     passDefinition.versionMajor = 1
     passDefinition.versionMinor = 0
     passDefinition.versionRevision = 0

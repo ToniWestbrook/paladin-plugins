@@ -35,7 +35,7 @@ import operator
 # Plugin connection definition
 def pluginConnect(passDefinition):
     passDefinition.name = "go"
-    passDefinition.description = "Perform gene ontology term analysis on a PALADIN UniProt report"
+    passDefinition.description = "Perform gene ontology term grouping and abundance reporting"
     passDefinition.versionMajor = 1
     passDefinition.versionMinor = 0
     passDefinition.versionRevision = 0

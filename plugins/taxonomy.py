@@ -43,7 +43,7 @@ lineageLookup = dict()
 # Plugin connection definition
 def pluginConnect(passDefinition):
     passDefinition.name = "taxonomy"
-    passDefinition.description = "Perform taxonomic categorization on a PALADIN UniProt report"
+    passDefinition.description = "Perform taxonomic grouping and abundance reporting"
     passDefinition.versionMajor = 1
     passDefinition.versionMinor = 0
     passDefinition.versionRevision = 0

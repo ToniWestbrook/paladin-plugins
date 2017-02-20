@@ -29,11 +29,13 @@ SOFTWARE.
 import os
 import re
 import subprocess
+import argparse
+import shlex
 import plugins.core
 
 # Plugin connection definition
 def pluginConnect(passDefinition):
-    passDefinition.name = 'alignment'
+    passDefinition.name = 'automate'
     passDefinition.description = 'Automate PALADIN execution across multiple sets of reads'
     passDefinition.versionMajor = 1
     passDefinition.versionMinor = 0
