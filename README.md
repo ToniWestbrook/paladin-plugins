@@ -91,4 +91,4 @@ Note, usage of the HPC plugin may terminate with an error if not running in an M
 
 Plugin Development
 --
-If you are interested in developing your own plugin, please see [plugin.template]() for details.
+If you are interested in developing your own plugin, please see [plugin.template](https://github.com/twestbrookunh/paladin-plugins/blob/master/plugins/plugin.template) for details.
