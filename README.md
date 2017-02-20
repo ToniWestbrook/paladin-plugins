@@ -88,3 +88,7 @@ mpirun paladin-plugins.py @@hpc reference.fasta.gz reads.fq.gz output -t 24 -P h
 ```
 
 Note, usage of the HPC plugin may terminate with an error if not running in an MPI aware environment.  
+
+Plugin Development
+--
+If you are interested in developing your own plugin, please see [plugin.template]() for details.
