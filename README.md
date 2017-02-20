@@ -14,6 +14,8 @@ PALADIN-plugins can be chained in a pipeline configuration using a single or mul
 - Uniprot: Download custom UniProt reports for a PALADIN prepared SAM alignment
 - Internal Commands: Flush, Write (screen and file output)
 
+Plugins in the pipeline are prepended with "@@", and are then given plugin specific arguments, which may be enumerated for any plugin with the "-h" argument.
+
 INSTALLATION
 --
 **Dependencies**
