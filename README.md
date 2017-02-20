@@ -34,42 +34,42 @@ SAMPLE COMMANDS
 
 List available plugins.
 ```
-paladin-plugins -l
+paladin-plugins.py -l
 ```
 
 Run PALADIN on all fastq (fq) files in a subdirectory that have "R1" in the filename using 16 threads, placing the output in each subdirectory:
 ```
-paladin-plugins @@automate reference.fasta.gz /path/subdir .*R1.*\.fq.gz -t 16 -o outfile
+paladin-plugins.py @@automate reference.fasta.gz /path/subdir .*R1.*\.fq.gz -t 16 -o outfile
 ```
 Combine the SAM and TSV outputs of the multiple PALADIN runs above into a single output
 ```
-paladin-plugins @@aggregation -r /path/subdir -s outfile\.sam -o combined
+paladin-plugins.py @@aggregation -r /path/subdir -s outfile\.sam -o combined
 ```
 
 Group GO terms and write abundances to a file, filtering for a mapping quality of 20
 ```
-paladin-plugins @@go -i input.tsv -q 20 @@write output.txt
+paladin-plugins.py @@go -i input.tsv -q 20 @@write output.txt
 ```
 
 Group all bacterial species and write abundances to a file, then plot data to a pie chart, filtering for a mapping quality of 30 and limited number of values shown on graph to 10
 
 ```
-paladin-plugins @@taxonomy -i input.tsv -q 30 -t species -r Bacteria @@write taxonomy.txt @@plotting -i taxonomy.txt -o chart.png -l 10 -L "My Chart" "My X-Axis", "My Y-Axis" -p -s 12 12
+paladin-plugins.py @@taxonomy -i input.tsv -q 30 -t species -r Bacteria @@write taxonomy.txt @@plotting -i taxonomy.txt -o chart.png -l 10 -L "My Chart" "My X-Axis", "My Y-Axis" -p -s 12 12
 ```
 
 Group flattened kingdoms (child ranks of domains [level 1]) to one file, group all species to second file, then show both charts side-by-side in a single PNG:
 ```
-paladin-plugins @@taxonomy -i input.tsv -q 30 -t children -l 1 @@write first.txt @@taxonomy -i input.tsv -q 30 -t species -l 0 @@write second.txt @@plotting -s 20 15 -g 1 2 @@plotting -i first.txt -l 10 -c 0 0 @@plotting -i second.txt -l 10 -c 0 1 -o chart.png
+paladin-plugins.py @@taxonomy -i input.tsv -q 30 -t children -l 1 @@write first.txt @@taxonomy -i input.tsv -q 30 -t species -l 0 @@write second.txt @@plotting -s 20 15 -g 1 2 @@plotting -i first.txt -l 10 -c 0 0 @@plotting -i second.txt -l 10 -c 0 1 -o chart.png
 ```
 
 Download a custom UniProt report with organism, protein names, go terms, comments, ec number, and kegg cross reference for fields, and save it to a file. The full list of available fields and database cross-references can be found on the [UniProt site](http://www.uniprot.org/help/query-fields): 
 ```
-paladin-plugins @@uniprot -i input.sam -c Organism "protein names" go comments ec "database(KEGG)" @@write report.txt
+paladin-plugins.py @@uniprot -i input.sam -c Organism "protein names" go comments ec "database(KEGG)" @@write report.txt
 ```
 
 Decluster a PALADIN run (note, in the current version, declustering can take a while to prepare its caches during each run. Therefore, if you have multiple declustering jobs, running them as a single paladin-plugins execution can speed up processing time significantly.  Future versions may eliminate this issue):
 ```
-paladin-plugins @@decluster -i input.tsv -q 20 @@write declustered-ref.fasta
+paladin-plugins.py @@decluster -i input.tsv -q 20 @@write declustered-ref.fasta
 ```
 
 HPC Plugin
