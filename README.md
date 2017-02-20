@@ -38,17 +38,21 @@ Run PALADIN on all fastq (fq) files in a subdirectory that have "R1" in the file
 ```
 paladin-plugins @@automate reference.fasta.gz /path/subdir .*R1.*\.fq.gz -t 16 -o outfile
 ```
+Combine the SAM and TSV outputs of the multiple PALADIN runs above into a single output
+```
+paladin-plugins @@aggregation -r /path/subdir -s outfile\.sam -o combined
+```
 
-Aggregate GO terms and write abundances to a file, filtering for a mapping quality of 20
+Group GO terms and write abundances to a file, filtering for a mapping quality of 20
 ```
 paladin-plugins @@go -i input.tsv -q 20 @@write output.txt
 ```
 
-Aggregate all bacterial species and write abundances to a file, then plot data to a pie chart, filtering for a mapping quality of 30 and limited number of values shown on graph to 10
+Group all bacterial species and write abundances to a file, then plot data to a pie chart, filtering for a mapping quality of 30 and limited number of values shown on graph to 10
 ```
 paladin-plugins @@taxonomy -i input.tsv -q 30 -t species -r Bacteria @@write taxonomy.txt @@plotting -i taxonomy.txt -o chart.png -l 10 -L "My Chart" "My X-Axis", "My Y-Axis" -p -s 12 12
 ```
-Aggregate flattened kingdoms (child ranks of domains [level 1]) to one file, aggregate all species to second file, then show both charts side-by-side in a single PNG:
+Group flattened kingdoms (child ranks of domains [level 1]) to one file, group all species to second file, then show both charts side-by-side in a single PNG:
 ```
 paladin-plugins @@taxonomy -i input.tsv -q 30 -t children -l 1 @@write first.txt @@taxonomy -i input.tsv -q 30 -t species -l 0 @@write second.txt @@plotting -s 20 15 -g 1 2 @@plotting -i first.txt -l 10 -c 0 0 @@plotting -i second.txt -l 10 -c 0 1 -o chart.png
 ```
