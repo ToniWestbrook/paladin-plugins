@@ -26,6 +26,7 @@ INSTALLATION
 
 ```
 git clone https://github.com/twestbrookunh/paladin-plugins.git
+chmod +xxx paladin-plugins/paladin-plugins.py (if desired)
 ```
 
 SAMPLE COMMANDS
