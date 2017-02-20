@@ -8,14 +8,18 @@ PALADIN-plugins can be chained in a pipeline configuration using a single or mul
 - Decluster: Generate a reference database containing each protein sequence used by UniProt to generate each UniRef cluster (during the CD-HIT clustering process) for those clusters detected in a PALADIN UniProt report.  This may be used for a second PALADIN pass, refining alignments from representative hits to member hits
 - Difference: Analyze relative differences between two PALADIN taxonomy reports.  Can also report specific contributing reads for each difference
 - GO: Perform gene ontology term grouping and abundance reporting
+- HPC: Distribute PALADIN execution across cluster nodes
+- Plotting: Generate plots in PNG format from pipeline generated data
+- Taxonomy: Perform taxonomic grouping and abundance reporting
+- Uniprot: Download custom UniProt reports for a PALADIN prepared SAM alignment
 
 INSTALLATION
 --
 **Dependencies**
 
+- PALADIN
 - Python 3
 - Python libraries: matplotlib, mpi4pyi, numpy, requests
-- PALADIN
 
 ```
 git clone https://github.com/twestbrookunh/paladin-plugins.git
