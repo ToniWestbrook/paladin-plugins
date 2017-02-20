@@ -68,10 +68,10 @@ The HPC plugin may be used to distribute a PALADIN execution across multiple clu
 ```
 #!/bin/bash
 
-#SBATCH -p hcgs
+#SBATCH -p target_partition
 #SBATCH --ntasks-per-node=1
 #SBATCH --ntasks=10
-#SBATCH --job-name="PALADIN run"
+#SBATCH --job-name="PALADIN"
 #SBATCH --output=running.log
 
 mpirun paladin-plugins.py @@hpc reference.fasta.gz reads.fq.gz output -t 24 -P http://proxy:3128
