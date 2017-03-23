@@ -45,8 +45,8 @@ def pluginConnect(passDefinition):
     passDefinition.name = "taxonomy"
     passDefinition.description = "Perform taxonomic grouping and abundance reporting"
     passDefinition.versionMajor = 1
-    passDefinition.versionMinor = 0
-    passDefinition.versionRevision = 0
+    passDefinition.versionMinor = 1
+    passDefinition.versionRevision = 1
 
     passDefinition.callbackInit = taxonomyInit
     passDefinition.callbackMain = taxonomyMain
@@ -67,7 +67,8 @@ def taxonomyMain(passArguments):
     argParser.add_argument('-q', dest='quality', type=int, required=True, help='Minimum mapping quality filter')
     argParser.add_argument('-c', dest='custom', type=str, default='', help='Species-parsing regex pattern for non-Uniprot entries')
     argParser.add_argument('-t', dest='type', type=str, default='species', choices=['children', 'species'], help='Type of report')
-    argParser.add_argument('-f', dest='filter', type=str, choices=['unknown', 'custom', 'group'], nargs='*', help='Filter non-standard entries ')
+    argParser.add_argument('-f', dest='filter', type=str, choices=['unknown', 'custom', 'group'], nargs='*', help='Filter non-standard entries')
+    argParser.add_argument('-s', dest='sam', type=str, help='SAM file for reporting reads contributing to each taxonomic rank')
     levelGroup = argParser.add_mutually_exclusive_group(required=True)
     levelGroup.add_argument('-l', dest='level', type=int, help='Hierarchy level')
     levelGroup.add_argument('-r', dest='rank', type=str, help='Regex pattern for named rank')
@@ -104,8 +105,13 @@ def taxonomyMain(passArguments):
             renderEntries = {speciesLookup[taxon]: renderEntries[taxon] for taxon in renderEntries}
             header = "Count\tAbundance\tSpecies"    
 
-    # Render report
-    renderAbundance(renderEntries, header, renderCount)
+    if not arguments[0].sam:
+        # Render report (if non-SAM mode)
+        renderAbundance(renderEntries, header, renderCount)
+    else:
+        # In SAM mode, generate reads report if requested
+        samData = groupSam(renderEntries, arguments[0].sam, speciesLookup, arguments[0].quality)
+        renderSam(samData)
 
 # Download lineage information from UniProt            
 def downloadLineage():
@@ -284,4 +290,43 @@ def renderAbundance(passData, passHeader, passTotal):
     for row in sortedData:
         abundance = row[1] / passTotal * 100
         outputLine = "{0}\t{1}\t{2}".format(row[1], abundance, row[0])
+        plugins.core.sendOutput(outputLine)
+
+# Group SAM reads per taxonomic rank
+def groupSam(passData, passSam, passSpecies, passQuality):
+    retData = dict()
+
+    # Simplify species lookup keys
+    speciesLookup = {item[0]: item[1] for item in passSpecies}
+
+    # Read SAM entries
+    samEntries = plugins.core.SamEntry.getEntries(passSam, passQuality)
+
+    for entry in samEntries:
+        reference = samEntries[entry].reference
+        
+        # Currently only handles UniProt
+        if not '_' in reference: continue
+
+        mnemonic = reference.split('_')[1]
+
+        # Skip entries that are too ambiguous (e.g. 9ZZZZ) or recently moved by UniProt
+        if not mnemonic in lineageLookup: continue
+        if not mnemonic in speciesLookup: continue
+
+        # Combine lineage and species for lookup into taxonomy results
+        lineage = [item.strip() for item in lineageLookup[mnemonic].split(';')]
+        lineage.append(speciesLookup[mnemonic])
+
+        for rank in lineage:
+            if rank in passData: retData[samEntries[entry].query] = rank
+
+    return retData
+
+# Render SAM reads per taxonomic rank
+def renderSam(passData):
+    plugins.core.sendOutput("Read\tTaxonomy")
+
+    for read in passData:
+        outputLine = "{0}\t{1}".format(read, passData[read])
         plugins.core.sendOutput(outputLine)
