@@ -39,7 +39,7 @@ def pluginConnect(passDefinition):
     passDefinition.description = 'Automate PALADIN execution across multiple sets of reads'
     passDefinition.versionMajor = 1
     passDefinition.versionMinor = 0
-    passDefinition.versionRevision = 0
+    passDefinition.versionRevision = 1
 
     #passDefinition.callbackInit = automateInit
     passDefinition.callbackMain = automateMain
@@ -64,7 +64,7 @@ def automateMain(passArguments):
             baseName = os.path.join(root, baseName)
             fullFile = os.path.join(root, fileName) 
 
-            command = "paladin align {0} {1} -o {2} {3}".format(arguments[0].reference, fullFile, baseName, arguments[0].options)
+            command = "paladin align {0} {1} -o {2} {3}".format(arguments[0].reference, fullFile, baseName, ' '.join(arguments[0].options))
             output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
 
             with open("{0}.log".format(baseName), 'wb') as fileHandle:
