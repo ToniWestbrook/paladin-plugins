@@ -46,7 +46,7 @@ def pluginConnect(passDefinition):
     passDefinition.description = "Perform taxonomic grouping and abundance reporting"
     passDefinition.versionMajor = 1
     passDefinition.versionMinor = 1
-    passDefinition.versionRevision = 1
+    passDefinition.versionRevision = 2
 
     passDefinition.callbackInit = taxonomyInit
     passDefinition.callbackMain = taxonomyMain
@@ -110,7 +110,7 @@ def taxonomyMain(passArguments):
         renderAbundance(renderEntries, header, renderCount)
     else:
         # In SAM mode, generate reads report if requested
-        samData = groupSam(renderEntries, arguments[0].sam, speciesLookup, arguments[0].quality)
+        samData = groupSam(renderEntries, arguments[0].sam, speciesLookup)
         renderSam(samData)
 
 # Download lineage information from UniProt            
@@ -293,14 +293,14 @@ def renderAbundance(passData, passHeader, passTotal):
         plugins.core.sendOutput(outputLine)
 
 # Group SAM reads per taxonomic rank
-def groupSam(passData, passSam, passSpecies, passQuality):
+def groupSam(passData, passSam, passSpecies):
     retData = dict()
 
     # Simplify species lookup keys
     speciesLookup = {item[0]: item[1] for item in passSpecies}
 
     # Read SAM entries
-    samEntries = plugins.core.SamEntry.getEntries(passSam, passQuality)
+    samEntries = plugins.core.SamEntry.getEntries(passSam, 0)
 
     for entry in samEntries:
         reference = samEntries[entry].reference
@@ -319,7 +319,10 @@ def groupSam(passData, passSam, passSpecies, passQuality):
         lineage.append(speciesLookup[mnemonic])
 
         for rank in lineage:
-            if rank in passData: retData[samEntries[entry].query] = rank
+            if rank in passData:
+                query = samEntries[entry].query
+                if not query in retData: retData[query] = list()
+                retData[query].append(rank)
 
     return retData
 
@@ -328,5 +331,6 @@ def renderSam(passData):
     plugins.core.sendOutput("Read\tTaxonomy")
 
     for read in passData:
-        outputLine = "{0}\t{1}".format(read, passData[read])
-        plugins.core.sendOutput(outputLine)
+        for rank in passData[read]:
+            outputLine = "{0}\t{1}".format(read, rank)
+            plugins.core.sendOutput(outputLine)

@@ -67,7 +67,7 @@ def declusterMain(passArguments):
     # Parse arguments 
     argParser = argparse.ArgumentParser(description='PALADIN Pipeline Plugins: Decluster', prog='decluster')                                                                                                                             
     argParser.add_argument('-i', dest='input', metavar='INPUT', type=str, required=True, help='PALADIN UniProt report')
-    argParser.add_argument('-q', dest='quality', type=int, help='Minimum mapping quality filter')
+    argParser.add_argument('-q', dest='quality', type=int, required=True, help='Minimum mapping quality filter')
     arguments = argParser.parse_known_args(shlex.split(passArguments))
 
     # Get entries
