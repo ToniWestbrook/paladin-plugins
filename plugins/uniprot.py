@@ -38,7 +38,7 @@ UNIPROT_TEMPLATE_INIT = "http://www.uniprot.org/uploadlists/"
 UNIPROT_TEMPLATE_JOB = "http://www.uniprot.org/jobs/{0}.stat"
 UNIPROT_TEMPLATE_RESULTS = "http://www.uniprot.org/uniprot/?query=job:{0}&format=tab&columns={1}"
 UNIPROT_REQUIRED = ['entry%20name', 'id']
-UNIPROT_COLUMNS = ['organism','prote in%20names','genes','pathway','features','go','reviewed','existence','comments','database(KEGG)','database(GeneID)','database(PATRIC)','database(EnsemblBacteria)']
+UNIPROT_COLUMNS = ['organism', 'protein%20names', 'genes', 'pathway', 'features', 'go', 'reviewed', 'existence', 'comments', 'database(KEGG)', 'database(GeneID)', 'database(PATRIC)', 'database(EnsemblBacteria)']
 
 # Plugin connection definition
 def pluginConnect(passDefinition):
@@ -46,7 +46,7 @@ def pluginConnect(passDefinition):
     passDefinition.description = "Download custom UniProt reports"
     passDefinition.versionMajor = 1
     passDefinition.versionMinor = 0
-    passDefinition.versionRevision = 0
+    passDefinition.versionRevision = 1
     passDefinition.dependencies=[]
 
     #passDefinition.callbackInit = uniprotInit
@@ -142,7 +142,10 @@ def retrieveData(passEntries, passColumns, passBatch, passRetry):
                 response = requests.post(UNIPROT_TEMPLATE_INIT, postData)
                 jobID = response.text
                 response.close()
-           
+
+                # Check for valid job ID
+                if any(x in jobID for x in ["<", " "]): raise
+
                 # Monitor if job has completed
                 url = UNIPROT_TEMPLATE_JOB.format(jobID)
                 jobComplete = ''
