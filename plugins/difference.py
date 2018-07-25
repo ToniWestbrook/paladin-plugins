@@ -1,13 +1,13 @@
 #! /usr/bin/env python3
 
-'''
+"""
 The MIT License
 
 Copyright (c) 2017 by Anthony Westbrook, University of New Hampshire <anthony.westbrook@unh.edu>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in 
-the Software without restriction, including without limitation the rights to 
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
 of the Software, and to permit persons to whom the Software is furnished to do
 so, subject to the following conditions:
@@ -15,246 +15,270 @@ so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-'''
+"""
 
 # Analyze difference between two PALADIN alignemnts
 
-import os
 import argparse
 import shlex
-import operator
-import re
-import plugins.core
+import core.main
+from core.datastore import DataStore
 
-# Plugin connection definition
-def pluginConnect(passDefinition):
-    passDefinition.name = "difference"
-    passDefinition.description = "Analyze relative differences between two PALADIN taxonomy reports"
-    passDefinition.versionMajor = 1
-    passDefinition.versionMinor = 0
-    passDefinition.versionRevision = 0
-    passDefinition.dependencies=['taxonomy']
 
-    #passDefinition.callbackInit = proteinInit
-    passDefinition.callbackMain = differenceMain
-   
-# Plugin main 
-def differenceMain(passArguments):
-    # Parse arguments 
-    argParser = argparse.ArgumentParser(description='PALADIN Pipeline Plugins: Difference', prog='difference')
-    argParser.add_argument('-1', dest='basisFiles', metavar=('Taxonomy', 'Sam', 'Uniprot'), type=str, nargs=3, required=True, help='Basis files of comparison (Taxonomy, Sam, UniProt)')
-    argParser.add_argument('-2', dest='compareFiles', metavar=('Taxonomy', 'Sam', 'Uniprot'), type=str, nargs=3, required=True, help='Compared files of comparison (Taxonomy, Sam, UniProt')
-    argParser.add_argument('-c', dest='custom', type=str, default='', help='Species-parsing regex pattern for non-UniProt entries')
-    argParser.add_argument('-s', dest='simple', action='store_true', help='Simple report, do not include mapped/unmapped read contributions (alters totals)')
-    arguments = argParser.parse_known_args(shlex.split(passArguments))
+def plugin_connect(definition):
+    definition.name = "difference"
+    definition.description = "Analyze relative differences between two PALADIN taxonomy reports"
+    definition.version_major = 1
+    definition.version_minor = 1
+    definition.version_revision = 0
+    definition.dependencies = ["taxonomy"]
 
-    runningData = list()
+    definition.callback_args = difference_args
+    # definition.callback_init = difference_init
+    definition.callback_main = difference_main
 
+
+def difference_args(subargs):
+    arg_parser = argparse.ArgumentParser(description="PALADIN Pipeline Plugins: Difference", prog="difference")
+    arg_parser.add_argument("-1", dest="basis_files", metavar=("Taxonomy", "Sam", "Uniprot"), type=str, nargs=3, required=True, help="Basis files of comparison (Taxonomy, Sam, UniProt)")
+    arg_parser.add_argument("-2", dest="compare_files", metavar=("Taxonomy", "Sam", "Uniprot"), type=str, nargs=3, required=True, help="Compared files of comparison (Taxonomy, Sam, UniProt")
+    arg_parser.add_argument("-c", dest="custom", type=str, default="", help="Species-parsing regex pattern for non-UniProt entries")
+    arg_parser.add_argument("-s", dest="simple", action="store_true", help="Simple report, do not include mapped/unmapped read contributions (alters totals)")
+    return arg_parser.parse_known_args(shlex.split(subargs))
+
+
+def difference_main(args):
     # Obtain taxonomy differences
-    plugins.core.sendOutput('Comparing taxonomy reports...', 'stderr')
-    taxonomyData, taxonomyTotal = taxonomyCompare((arguments[0].basisFiles[0], arguments[0].compareFiles[0]))
-        
+    core.main.send_output("Comparing taxonomy reports...", "stderr")
+    taxonomy_data, taxonomy_total = taxonomy_compare((args[0].basis_files[0], args[0].compare_files[0]))
+
     # Obtain SAM differences with Uniprot info for full report
-    samData = list()
-    uniprotData = list()
-    if not arguments[0].simple:
-        plugins.core.sendOutput('Gathering SAM data from first alignment', 'stderr')
-        samEntries1 = plugins.core.SamEntry.getEntries(arguments[0].basisFiles[1], -1)
-        plugins.core.sendOutput('Gathering SAM data from second alignment', 'stderr')
-        samEntries2 = plugins.core.SamEntry.getEntries(arguments[0].compareFiles[1], -1)
-        plugins.core.sendOutput('Comparing SAM data...', 'stderr')
-        samData = samCompare(samEntries1, samEntries2)
+    uniprot_data = list()
+    if not args[0].simple:
+        core.main.send_output("Gathering SAM data from first alignment", "stderr")
+        sam_entries1 = core.main.SamEntry.get_entries(args[0].basis_files[1], -1)
+        core.main.send_output("Gathering SAM data from second alignment", "stderr")
+        sam_entries2 = core.main.SamEntry.get_entries(args[0].compare_files[1], -1)
+        core.main.send_output("Comparing SAM data...", "stderr")
+        sam_data = sam_compare(sam_entries1, sam_entries2)
 
         # Get Uniprot entries
-        plugins.core.sendOutput('Gathering UniProt data from first alignment', 'stderr')
-        uniprotData.append(plugins.core.PaladinEntry.getEntries(arguments[0].basisFiles[2], 0, arguments[0].custom))
-        plugins.core.sendOutput('Gathering UniProt data from second alignment', 'stderr')
-        uniprotData.append(plugins.core.PaladinEntry.getEntries(arguments[0].compareFiles[2], 0, arguments[0].custom))
+        core.main.send_output("Gathering UniProt data from first alignment", "stderr")
+        uniprot_data.append(core.main.PaladinEntry.get_entries(args[0].basis_files[2], 0, args[0].custom))
+        core.main.send_output("Gathering UniProt data from second alignment", "stderr")
+        uniprot_data.append(core.main.PaladinEntry.get_entries(args[0].compare_files[2], 0, args[0].custom))
 
-    plugins.core.sendOutput('Comparing alignments...', 'stderr')
-    combinedData = combinedCompare(taxonomyData, samData, uniprotData, plugins.taxonomy.lineageLookup, taxonomyTotal)
-    renderCombined(combinedData, arguments[0].simple)
+    core.main.send_output("Comparing alignments...", "stderr")
+    combined_data = combined_compare(taxonomy_data, sam_data, uniprot_data, taxonomy_total)
+    render_combined(combined_data, args[0].simple)
 
-# Taxonomy report comparison
-def taxonomyCompare(passReports):
-    retDifference = dict()
-    retTotal = 0
-    reportData = (dict(), dict())
+
+def taxonomy_compare(reports):
+    """ Taxonomy report comparison """
+    ret_difference = dict()
+    ret_total = 0
+    report_data = (dict(), dict())
 
     # Read files into memory
     for idx in range(2):
-        with open(passReports[idx], 'r') as fileHandle:
+        with open(reports[idx], "r") as handle:
             # Skip header
-            fileHandle.readline()
+            handle.readline()
 
-            for line in fileHandle:
-                line = line.rstrip()
-                fields = line.split("\t")
-                reportData[idx][fields[2]] = int(fields[0])
-                if idx == 1: retTotal += int(fields[0])
+            for line in handle:
+                fields = line.rstrip().split("\t")
+                report_data[idx][fields[2]] = int(fields[0])
+                if idx == 1:
+                    ret_total += int(fields[0])
 
     # Calculate differences (set 1, set 2, shared)
-    set1Keys = set(reportData[0].keys())
-    set2Keys = set(reportData[1].keys())
-    sharedKeys = set1Keys.intersection(set2Keys)
-    set1Keys = set1Keys.difference(sharedKeys)
-    set2Keys = set2Keys.difference(sharedKeys)
-    
-    retDifference = {key: (reportData[1][key] - reportData[0][key]) for key in sharedKeys}
-    retDifference.update({key: -reportData[0][key] for key in set1Keys})
-    retDifference.update({key: reportData[1][key] for key in set2Keys})
+    set1_keys = set(report_data[0].keys())
+    set2_keys = set(report_data[1].keys())
+    shared_keys = set1_keys.intersection(set2_keys)
+    set1_keys = set1_keys.difference(shared_keys)
+    set2_keys = set2_keys.difference(shared_keys)
 
-    return retDifference, retTotal
+    ret_difference = {key: (report_data[1][key] - report_data[0][key]) for key in shared_keys}
+    ret_difference.update({key: -report_data[0][key] for key in set1_keys})
+    ret_difference.update({key: report_data[1][key] for key in set2_keys})
 
-# SAM entries comparison
-def samCompare(passEntries1, passEntries2):
-    retDiff = dict()
+    return ret_difference, ret_total
 
-    # Use set 1 as the baseRead 
-    for entry in passEntries1:
+
+def sam_compare(entries1, entries2):
+    """ SAM entries comparison """
+    ret_diff = dict()
+
+    # Use set 1 as the baseRead
+    for entry in entries1:
         # Iterate through possible supplementary hits until neither available
-        readIdx = (entry[0], 0)
-        while readIdx in passEntries1 or readIdx in passEntries2:
-            if not readIdx in passEntries1:
-                ref1 = '*'
-                ref2 = passEntries2[readIdx].reference
-            elif not readIdx in passEntries2:
-                ref1 = passEntries1[readIdx].reference
-                ref2 = '*'
+        read_idx = (entry[0], 0)
+        while read_idx in entries1 or read_idx in entries2:
+            if read_idx not in entries1:
+                ref1 = "*"
+                ref2 = entries2[read_idx].reference
+            elif read_idx not in entries2:
+                ref1 = entries1[read_idx].reference
+                ref2 = "*"
             else:
-                ref1 = passEntries1[readIdx].reference
-                ref2 = passEntries2[readIdx].reference
+                ref1 = entries1[read_idx].reference
+                ref2 = entries2[read_idx].reference
 
-            # Note references that do not match 
+            # Note references that do not match
             if ref1 != ref2:
-                diffPair = (ref1, ref2)
-                if not diffPair in retDiff: retDiff[diffPair] = 0
-                retDiff[diffPair] += 1
+                diff_pair = (ref1, ref2)
+                if diff_pair not in ret_diff:
+                    ret_diff[diff_pair] = 0
+                ret_diff[diff_pair] += 1
 
-            readIdx = (readIdx[0], readIdx[1] + 1)
+            read_idx = (read_idx[0], read_idx[1] + 1)
 
-    return retDiff
+    return ret_diff
 
-# Combined compare breaks down taxonomy report on per read basis, then aggregates
-def combinedCompare(passTaxonomyEntries, passSamEntries, passUniprotEntries, passLineageLookup, passTotal):
-    retEntries = dict()
-    
+
+def combined_compare(taxonomy_entries, sam_entries, uniprot_entries, pass_total):
+    """ Combined compare breaks down taxonomy report on per read basis, then aggregates """
+    ret_entries = dict()
+
     # Calculate unmapped difference and add to taxonomy set
-    unmappedDiff = 0 
-    for samEntry in passSamEntries:
-        for setIdx in range(2):
-            if samEntry[setIdx] == '*': 
-                if setIdx == 0: passTotal += 1
-                unmappedDiff += [1, -1][setIdx]
+    unmapped_diff = 0
+    for sam_entry in sam_entries:
+        for set_idx in range(2):
+            if sam_entry[set_idx] == "*":
+                if set_idx == 0:
+                    pass_total += 1
+
+                unmapped_diff += [1, -1][set_idx]
 
     # Add unmapped entry to taxonomy list
-    passTaxonomyEntries['Unmapped'] = unmappedDiff
+    taxonomy_entries["Unmapped"] = unmapped_diff
 
-    # Iterate through each taxonomy grouping 
-    for taxonEntry in passTaxonomyEntries:
+    # Iterate through each taxonomy grouping
+    for taxon_entry in taxonomy_entries:
         # Skip unchanged entries
-        if passTaxonomyEntries[taxonEntry] == 0: continue
+        if taxonomy_entries[taxon_entry] == 0:
+            continue
 
         # Prepare entry if new
-        if not taxonEntry in retEntries: 
-            retEntries[taxonEntry] = (dict(), passTaxonomyEntries[taxonEntry]/passTotal)
+        if taxon_entry not in ret_entries:
+            ret_entries[taxon_entry] = (dict(), taxonomy_entries[taxon_entry] / pass_total)
 
         # Scan SAM entries for matching lineage
-        for samEntry in passSamEntries:
+        for sam_entry in sam_entries:
             # Lookup species and lineage
-            samRecords = list()
+            sam_records = list()
             lineage = list()
-            
-            for setIdx in range(2):
-                if samEntry[setIdx] == '*': 
-                    missRecord = type('missRecord', (object,), {})()
-                    missRecord.speciesID = 'Unmapped'
-                    missRecord.speciesFull = 'Unmapped'
-                    samRecords.append(missRecord)
-                    lineage.append('Unmapped')
+
+            for set_idx in range(2):
+                if sam_entry[set_idx] == "*":
+                    miss_record = type("miss_record", (object,), {})()
+                    miss_record.species_id = "Unmapped"
+                    miss_record.species_full = "Unmapped"
+                    sam_records.append(miss_record)
+                    lineage.append("Unmapped")
                 else:
-                    samRecords.append(passUniprotEntries[setIdx][samEntry[setIdx].split('|')[-1]])
-                    if samRecords[setIdx].speciesID in passLineageLookup:
-                        lineage.append([x.strip() for x in passLineageLookup[samRecords[setIdx].speciesID].split(';')])
+                    sam_records.append(uniprot_entries[set_idx][sam_entry[set_idx].split("|")[-1]])
+                    species_id = sam_records[set_idx].species_id
+                    result = DataStore.get_entry("taxonomy").exec_query("lineage-lookup", [species_id]).fetchone()
+
+                    if result:
+                        lineage.append([x.strip() for x in result[0].split(";")])
                     else:
                         lineage.append("Unknown")
-                    
-            for setIdx in range(2):
-                # Attempt to match on species
-                if samRecords[setIdx].speciesFull == taxonEntry: 
-                    samSpecies = samRecords[1-setIdx].speciesFull
-                    
-                    samAmount = [1, -1][setIdx] * passSamEntries[samEntry]
 
-                    if not samSpecies in retEntries[taxonEntry][0]: retEntries[taxonEntry][0][samSpecies] = (0, 0)
-                    samParts = retEntries[taxonEntry][0][samSpecies]
-                    
-                    if samAmount > 0: retEntries[taxonEntry][0][samSpecies] = (samParts[0] + samAmount, samParts[1])
-                    else: retEntries[taxonEntry][0][samSpecies] = (samParts[0], samParts[1] + samAmount) 
+            for set_idx in range(2):
+                # Attempt to match on species
+                if sam_records[set_idx].species_full == taxon_entry:
+                    sam_species = sam_records[1 - set_idx].species_full
+                    sam_amount = [1, -1][set_idx] * sam_entries[sam_entry]
+
+                    if sam_species not in ret_entries[taxon_entry][0]:
+                        ret_entries[taxon_entry][0][sam_species] = (0, 0)
+
+                    sam_parts = ret_entries[taxon_entry][0][sam_species]
+
+                    if sam_amount > 0:
+                        ret_entries[taxon_entry][0][sam_species] = (sam_parts[0] + sam_amount, sam_parts[1])
+                    else:
+                        ret_entries[taxon_entry][0][sam_species] = (sam_parts[0], sam_parts[1] + sam_amount)
 
                     break
 
                 # Attempt to match on lineage
-                for rankIdx in range(len(lineage[setIdx])):
-                    if lineage[setIdx][rankIdx] == taxonEntry:
-                        compareIdx = rankIdx
-                        if compareIdx >= len(lineage[1-setIdx]): compareIdx = len(lineage[1-setIdx]) - 1
-                        samLineage = lineage[1-setIdx][compareIdx]
-                        samAmount = [1, -1][setIdx] * passSamEntries[samEntry]
+                for rank_idx in range(len(lineage[set_idx])):
+                    if lineage[set_idx][rank_idx] == taxon_entry:
+                        compare_idx = rank_idx
 
-                        if not samLineage in retEntries[taxonEntry][0]: retEntries[taxonEntry][0][samLineage] = (0, 0)
-                        samParts = retEntries[taxonEntry][0][samLineage]
+                        if compare_idx >= len(lineage[1 - set_idx]):
+                            compare_idx = len(lineage[1 - set_idx]) - 1
 
-                        if samAmount > 0: retEntries[taxonEntry][0][samLineage] = (samParts[0] + samAmount, samParts[1])
-                        else: retEntries[taxonEntry][0][samLineage] = (samParts[0], samParts[1] + samAmount)
+                        sam_lineage = lineage[1 - set_idx][compare_idx]
+                        sam_amount = [1, -1][set_idx] * sam_entries[sam_entry]
+
+                        if sam_lineage not in ret_entries[taxon_entry][0]:
+                            ret_entries[taxon_entry][0][sam_lineage] = (0, 0)
+
+                        sam_parts = ret_entries[taxon_entry][0][sam_lineage]
+
+                        if sam_amount > 0:
+                            ret_entries[taxon_entry][0][sam_lineage] = (sam_parts[0] + sam_amount, sam_parts[1])
+                        else:
+                            ret_entries[taxon_entry][0][sam_lineage] = (sam_parts[0], sam_parts[1] + sam_amount)
+
                         break
 
     # Calculate percentages
-    for taxonomyEntry in retEntries:
-        for samEntry in retEntries[taxonomyEntry][0]:
-            samParts = retEntries[taxonomyEntry][0][samEntry] 
-            retEntries[taxonomyEntry][0][samEntry] = (samParts[0]/passTotal, samParts[1]/passTotal) 
- 
-    return retEntries
+    for taxonomy_entry in ret_entries:
+        for sam_entry in ret_entries[taxonomy_entry][0]:
+            sam_parts = ret_entries[taxonomy_entry][0][sam_entry]
+            ret_entries[taxonomy_entry][0][sam_entry] = (sam_parts[0] / pass_total, sam_parts[1] / pass_total)
 
-# Align stats returns 3-tuple (Different, Added, Removed)
-def alignStats(passEntries1, passEntries2):
-    totalDiff = 0
-    totalAdd = 0
-    totalDel = 0 
+    return ret_entries
 
-    for entry in passEntries1:
-        if passEntries1[entry].flag & 0x4 == passEntries2[entry].flag & 0x4:
+
+def align_stats(entries1, entries2):
+    """ Align stats returns 3-tuple (Different, Added, Removed) """
+    total_diff = 0
+    total_add = 0
+    total_del = 0
+
+    for entry in entries1:
+        if entries1[entry].flag & 0x4 == entries2[entry].flag & 0x4:
             # Matching map types
-            if passEntries1[entry].reference != passEntries2[entry].reference: 
-                totalDiff += 1
+            if entries1[entry].reference != entries2[entry].reference:
+                total_diff += 1
         else:
-            if passEntries1[entry].flag & 0x4 > 0: totalAdd += 1
-            else: totalDel += 1
+            if entries1[entry].flag & 0x4 > 0:
+                total_add += 1
+            else: total_del += 1
 
-    return (totalDiff, totalAdd, totalDel)
+    return (total_diff, total_add, total_del)
 
-# Render combined report
-def renderCombined(passData, passSimple):
+
+def render_combined(data, simple):
+    """ Render combined report """
     # Render appropriate header
-    if passSimple: header = "Taxon\tDifference"
-    else: header = "Taxon\tDifference\tContributor\tContribution (Pos)\tContribution (Neg)"
-    plugins.core.sendOutput(header)
+    if simple:
+        header = "Taxon\tDifference"
+    else:
+        header = "Taxon\tDifference\tContributor\tContribution (Pos)\tContribution (Neg)"
 
-    sortedTaxa = sorted(passData.items(), key = lambda item: abs(item[1][1]), reverse=True)
+    core.main.send_output(header)
 
-    for taxonEntry in sortedTaxa:
-        if passSimple:
-            plugins.core.sendOutput("{0}\t{1}".format(taxonEntry[0], taxonEntry[1][1]))
-        else: 
+    sorted_taxa = sorted(data.items(), key=lambda item: abs(item[1][1]), reverse=True)
+
+    for taxon_entry in sorted_taxa:
+        if simple:
+            core.main.send_output("{0}\t{1}".format(taxon_entry[0], taxon_entry[1][1]))
+        else:
             # Sort SAM data
-            sortedSam = sorted(taxonEntry[1][0].items(), key = lambda item: abs(item[1][0] + item[1][1]), reverse=True)
-            for samEntry in sortedSam:
-                plugins.core.sendOutput("{0}\t{1}\t{2}\t{3}\t{4}".format(taxonEntry[0], taxonEntry[1][1], samEntry[0], samEntry[1][0], samEntry[1][1]))
+            sorted_sam = sorted(taxon_entry[1][0].items(), key=lambda item: abs(item[1][0] + item[1][1]), reverse=True)
+            for sam_entry in sorted_sam:
+                core.main.send_output("{0}\t{1}\t{2}\t{3}\t{4}".format(taxon_entry[0], taxon_entry[1][1], sam_entry[0], sam_entry[1][0], sam_entry[1][1]))

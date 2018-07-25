@@ -1,13 +1,13 @@
 #! /usr/bin/env python3
 
-'''
+"""
 The MIT License
 
 Copyright (c) 2017 by Anthony Westbrook, University of New Hampshire <anthony.westbrook@unh.edu>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in 
-the Software without restriction, including without limitation the rights to 
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
 of the Software, and to permit persons to whom the Software is furnished to do
 so, subject to the following conditions:
@@ -15,322 +15,335 @@ so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-'''
+"""
 
 # Perform taxonomic categorization on a PALADIN UniProt report
 
-import os
 import re
 import operator
 import argparse
 import shlex
-import plugins.core
+import core.main
+from core.main import SamEntry
+from core.main import PaladinEntry
+from core.datastore import DataStore
+from core.filestore import FileStore
 
-TAXONOMY_DOWNLOAD = 'http://www.uniprot.org/taxonomy/?query=&sort=score&format=tab'
-TAXONOMY_RAW = 'lineage-raw.dat'
-TAXONOMY_LINEAGE = 'lineage.dat'
 
-moduleDefinition = None
-lineageLookup = dict()
+def plugin_connect(definition):
+    definition.name = "taxonomy"
+    definition.description = "Perform taxonomic grouping and abundance reporting"
+    definition.version_major = 1
+    definition.version_minor = 1
+    definition.version_revision = 2
 
-# Plugin connection definition
-def pluginConnect(passDefinition):
-    passDefinition.name = "taxonomy"
-    passDefinition.description = "Perform taxonomic grouping and abundance reporting"
-    passDefinition.versionMajor = 1
-    passDefinition.versionMinor = 1
-    passDefinition.versionRevision = 2
+    definition.callback_args = taxonomy_args
+    definition.callback_init = taxonomy_init
+    definition.callback_main = taxonomy_main
 
-    passDefinition.callbackInit = taxonomyInit
-    passDefinition.callbackMain = taxonomyMain
 
-    plugins.taxonomy.moduleDefinition = passDefinition
+def taxonomy_args(sub_args):
+    arg_parser = argparse.ArgumentParser(description="PALADIN Pipeline Plugins: Taxonomy", prog="taxonomy")
+    arg_parser.add_argument("-i", dest="input", type=str, required=True, help="PALADIN UniProt report")
+    arg_parser.add_argument("-q", dest="quality", type=int, required=True, help="Minimum mapping quality filter")
+    arg_parser.add_argument("-c", dest="custom", type=str, default="", help="Species-parsing regex pattern for non-Uniprot entries")
+    arg_parser.add_argument("-t", dest="type", type=str, default="species", choices=["children", "species"], help="Type of report")
+    arg_parser.add_argument("-f", dest="filter", type=str, choices=["unknown", "custom", "group"], nargs="*", help="Filter non-standard entries")
+    arg_parser.add_argument("-s", dest="sam", type=str, help="SAM file for reporting reads contributing to each taxonomic rank")
+    levelGroup = arg_parser.add_mutually_exclusive_group(required=True)
+    levelGroup.add_argument("-l", dest="level", type=int, help="Hierarchy level")
+    levelGroup.add_argument("-r", dest="rank", type=str, help="Regex pattern for named rank")
 
-# Ensure all UniProt taxonomy data is cached
-def taxonomyInit():
-   # Download UniProt taxonomic lineage data
-    downloadLineage()
-    parseLineage()
-    cacheLineage()
+    return arg_parser.parse_known_args(shlex.split(sub_args))
 
-# Plugin main
-def taxonomyMain(passArguments):
-    argParser = argparse.ArgumentParser(description='PALADIN Pipeline Plugins: Taxonomy', prog='taxonomy')
-    argParser.add_argument('-i', dest='input', type=str, required=True, help='PALADIN UniProt report')
-    argParser.add_argument('-q', dest='quality', type=int, required=True, help='Minimum mapping quality filter')
-    argParser.add_argument('-c', dest='custom', type=str, default='', help='Species-parsing regex pattern for non-Uniprot entries')
-    argParser.add_argument('-t', dest='type', type=str, default='species', choices=['children', 'species'], help='Type of report')
-    argParser.add_argument('-f', dest='filter', type=str, choices=['unknown', 'custom', 'group'], nargs='*', help='Filter non-standard entries')
-    argParser.add_argument('-s', dest='sam', type=str, help='SAM file for reporting reads contributing to each taxonomic rank')
-    levelGroup = argParser.add_mutually_exclusive_group(required=True)
-    levelGroup.add_argument('-l', dest='level', type=int, help='Hierarchy level')
-    levelGroup.add_argument('-r', dest='rank', type=str, help='Regex pattern for named rank')
 
-    arguments = argParser.parse_known_args(shlex.split(passArguments))
-    if arguments[0].filter == None: arguments[0].filter = []
+def taxonomy_init():
+    # Setup FileStore
+    FileStore("taxonomy-db", "taxonomy-db", "taxonomy.db", None, FileStore.FTYPE_CACHE, FileStore.FOPT_NORMAL)
+    FileStore("taxonomy-lineage", "taxonomy-lineage", "taxonomy-lineage.dat", "http://www.uniprot.org/taxonomy/?query=&sort=score&format=tab", FileStore.FTYPE_TEMP, FileStore.FOPT_NORMAL)
+
+    # Setup DataStore
+    DataStore("taxonomy", FileStore.get_entry("taxonomy-db").path)
+    DataStore.get_entry("taxonomy").create_table("lineage", [("mnemonic", "text", "PRIMARY KEY"), ("lineage", "text", "")])
+    DataStore.get_entry("taxonomy").define_query("lineage-lookup", "SELECT lineage FROM lineage WHERE mnemonic = ?")
+
+    # Populate database
+    populate_database()
+
+
+def taxonomy_main(args):
+    if args[0].filter is None:
+        args[0].filter = []
 
     # Get entries
-    fullEntries = plugins.core.PaladinEntry.getEntries(arguments[0].input, arguments[0].quality, arguments[0].custom)
-    speciesLookup = getSpeciesLookup(fullEntries)
-    taxaEntries, taxaCount = aggregateTaxa(fullEntries, arguments[0].filter)
-    lineageTree = treeifyLineage(taxaEntries, taxaCount)
+    full_entries = PaladinEntry.get_entries(args[0].input, args[0].quality, args[0].custom)
+    species_lookup = get_species_lookup(full_entries)
+    taxa_entries, taxa_count = aggregate_taxa(full_entries, args[0].filter)
+    lineage_tree = treeify_lineage(taxa_entries, taxa_count)
 
     # Check report combinations
-    if arguments[0].type == 'children':
-        if arguments[0].level != None:
+    if args[0].type == "children":
+        if args[0].level is not None:
             # Children of a flattened level
-            renderEntries, renderCount = flattenTree(lineageTree, arguments[0].level)
-            header = "Count\tAbundance\tRank {0}".format(arguments[0].level)
+            render_entries, render_count = flatten_tree(lineage_tree, args[0].level)
+            header = "Count\tAbundance\tRank {0}".format(args[0].level)
         else:
             # Children of a rank subtree
-            rankTree = findRankSubtree(lineageTree, arguments[0].rank)
-            renderEntries, renderCount = getTreeChildren(rankTree)
+            rank_tree = find_rank_subtree(lineage_tree, args[0].rank)
+            render_entries, render_count = get_tree_children(rank_tree)
             header = "Count\tAbundance\tRank"
     else:
-        if arguments[0].level != None:
+        if args[0].level is not None:
             # All species for entire tree
-            renderEntries, renderCount = filterTaxa(taxaEntries, ".*")
-            renderEntries = {speciesLookup[taxon]: renderEntries[taxon] for taxon in renderEntries}
+            render_entries, render_count = filter_taxa(taxa_entries, ".*")
+            render_entries = {species_lookup[taxon]: render_entries[taxon] for taxon in render_entries}
             header = "Count\tAbundance\tSpecies"
         else:
             # All species of a rank subtree
-            renderEntries, renderCount = filterTaxa(taxaEntries, arguments[0].rank)
-            renderEntries = {speciesLookup[taxon]: renderEntries[taxon] for taxon in renderEntries}
-            header = "Count\tAbundance\tSpecies"    
+            render_entries, render_count = filter_taxa(taxa_entries, args[0].rank)
+            render_entries = {species_lookup[taxon]: render_entries[taxon] for taxon in render_entries}
+            header = "Count\tAbundance\tSpecies"
 
-    if not arguments[0].sam:
+    if not args[0].sam:
         # Render report (if non-SAM mode)
-        renderAbundance(renderEntries, header, renderCount)
+        render_abundance(render_entries, header, render_count)
     else:
         # In SAM mode, generate reads report if requested
-        samData = groupSam(renderEntries, arguments[0].sam, speciesLookup)
-        renderSam(samData)
+        sam_data = group_sam(render_entries, args[0].sam, species_lookup)
+        render_sam(sam_data)
 
-# Download lineage information from UniProt            
-def downloadLineage():
-    downloadPath = os.path.join(plugins.core.getCacheDir(plugins.taxonomy.moduleDefinition), TAXONOMY_RAW)
-    plugins.core.downloadURL(TAXONOMY_DOWNLOAD, downloadPath, 'UniProt taxonomic lineage data')
 
-# Parse and filter relevant lineage information from raw data
-def parseLineage():
-    inputPath = os.path.join(plugins.core.getCacheDir(plugins.taxonomy.moduleDefinition), TAXONOMY_RAW)
-    outputPath = os.path.join(plugins.core.getCacheDir(plugins.taxonomy.moduleDefinition), TAXONOMY_LINEAGE)
+def populate_database():
+    """ Generate (if necessary) and get lineage lookup """
+    if not DataStore.get_entry("taxonomy").get_expired("lineage", 30):
+        return
 
-    # Check if file has already been parsed
-    if os.path.exists(outputPath): return
+    core.main.send_output("Populating taxonomic lineage data...", "stderr")
 
-    with open(inputPath, 'r') as inputHandle:
-        with open(outputPath, 'w') as outputHandle:
-            # Parse out taxonomy for entries with Mnemonics
-            inputHandle.readline()
+    # Download tab delimited data
+    entry = FileStore.get_entry("taxonomy-lineage")
+    entry.prepare()
 
-            for line in inputHandle:
-                line = line.rstrip()
-                fields = line.split("\t")
-                
-                if len(fields) < 9: continue
+    # Start transaction and empty any existing data
+    DataStore.get_entry("taxonomy").process_trans()
+    DataStore.get_entry("taxonomy").delete_rows("lineage")
 
-                if fields[1]: 
-                    outputHandle.write("{0}\t{1}\n".format(fields[1], fields[8]))
+    # Iterate through downloaded table and add rows
+    with entry.get_handle("r") as handle:
+        for line in handle:
+            fields = line.rstrip().split("\t")
+            if len(fields) < 9 or fields[1] == "":
+                continue
 
-# Cache lineage data for repeated taxonomic queries
-def cacheLineage():
-    # Clear cache
-    lineageLookup.clear()
+            # Add to database
+            DataStore.get_entry("taxonomy").insert_rows("lineage", [(fields[1], fields[8])])
 
-    # Open processed lineage data
-    lineagePath = os.path.join(plugins.core.getCacheDir(plugins.taxonomy.moduleDefinition), TAXONOMY_LINEAGE)
-    with open(lineagePath, 'r') as fileHandle:
+    # Finalize transaction and current table age
+    DataStore.get_entry("taxonomy").process_trans()
+    DataStore.get_entry("taxonomy").update_age("lineage")
 
-        # Cache lineage data
-        plugins.core.sendOutput("Caching taxonomic lineage data...", 'stderr')
 
-        for line in fileHandle:
-            line = line.rstrip()
-            fields = line.split("\t")
-          
-            if len(fields) < 2: 
-                lineageLookup[fields[0]] = 'Unknown'
-            else:
-                lineageLookup[fields[0]] = fields[1]
-
-# Group, filter, and count taxa
-def aggregateTaxa(passEntries, passFilters):
-    PaladinEntry = plugins.core.PaladinEntry
-    retTaxa = dict()
-    retTotal = 0
+def aggregate_taxa(entries, filters):
+    """ Group, filter, and count taxa """
+    ret_taxa = dict()
+    ret_total = 0
 
     # For each entry, filter, get species ID, and summate count
-    for entry in passEntries:
+    for entry in entries:
         # Check for removed filters
-        if "unknown" in passFilters and passEntries[entry].type == PaladinEntry.TYPE_UNKNOWN: continue
-        if "custom" in passFilters and passEntries[entry].type == PaladinEntry.TYPE_CUSTOM: continue
-        if "group" in passFilters and passEntries[entry].type == PaladinEntry.TYPE_UNIPROT_GROUP: continue
+        if "unknown" in filters and entries[entry].type == PaladinEntry.TYPE_UNKNOWN:
+            continue
+        if "custom" in filters and entries[entry].type == PaladinEntry.TYPE_CUSTOM:
+            continue
+        if "group" in filters and entries[entry].type == PaladinEntry.TYPE_UNIPROT_GROUP:
+            continue
 
-        key = (passEntries[entry].speciesID, passEntries[entry].speciesFull)
-        if not key in retTaxa: retTaxa[key] = 0
+        key = (entries[entry].species_id, entries[entry].species_full)
+        if key not in ret_taxa:
+            ret_taxa[key] = 0
 
-        count = passEntries[entry].count
-        retTaxa[key] += count
-        retTotal += count
-   
-    return retTaxa, retTotal 
+        count = entries[entry].count
+        ret_taxa[key] += count
+        ret_total += count
 
-# Filter taxa having a specific taxonomic rank (as regex)
-def filterTaxa(passTaxa, passPattern):
-    retTaxa = dict()
-    retCount = 0
+    return ret_taxa, ret_total
 
-    for taxon in passTaxa:
-        if taxon[0] in lineageLookup: lineage = lineageLookup[taxon[0]]
-        else: lineage = 'Unknown'
 
-        if re.search(passPattern, lineage):
-            retTaxa[taxon] = passTaxa[taxon]
-            retCount += passTaxa[taxon]
+def filter_taxa(taxa, pattern):
+    """ Filter taxa having a specific taxonomic rank (as regex) """
+    ret_taxa = dict()
+    ret_count = 0
 
-    return retTaxa, retCount
+    for taxon in taxa:
+        result = DataStore.get_entry("taxonomy").exec_query("lineage-lookup", [taxon[0]]).fetchone()
+        lineage = result[0] if result else "Unknown"
 
-# Create a speciesID to species full lookup
-def getSpeciesLookup(passEntries):
-    retLookup = dict()
+        if re.search(pattern, lineage):
+            ret_taxa[taxon] = taxa[taxon]
+            ret_count += taxa[taxon]
 
-    for entry in passEntries:
+    return ret_taxa, ret_count
+
+
+def get_species_lookup(entries):
+    """ Create a species_id to species full lookup """
+    ret_lookup = dict()
+
+    for entry in entries:
         # For virtual group entries, save as full species name
-        key = (passEntries[entry].speciesID, passEntries[entry].speciesFull)
+        key = (entries[entry].species_id, entries[entry].species_full)
 
-        if not key in retLookup:
-            retLookup[key] = passEntries[entry].speciesFull
+        if key not in ret_lookup:
+            ret_lookup[key] = entries[entry].species_full
 
-    return retLookup
-    
-# Create tree structure out of taxa/lineage data
-def treeifyLineage(passTaxaEntries, passTaxaCount):
-    retTree = (dict(), passTaxaCount)
+    return ret_lookup
 
-    for taxon in passTaxaEntries:
-        if not taxon[0] in lineageLookup: continue
-        rawLineage = lineageLookup[taxon[0]]
-        ranks = rawLineage.split(';')
-        parent = retTree[0]
+
+def treeify_lineage(taxa_entries, taxa_count):
+    """ Create tree structure out of taxa/lineage data """
+    ret_tree = (dict(), taxa_count)
+
+    for taxon in taxa_entries:
+        result = DataStore.get_entry("taxonomy").exec_query("lineage-lookup", [taxon[0]]).fetchone()
+        if not result:
+            continue
+
+        raw_lineage = result[0]
+        ranks = raw_lineage.split(";")
+        parent = ret_tree[0]
 
         for rank in ranks:
             rank = rank.strip()
 
             # Start new dictionary, initialize size cache
-            if not rank in parent: parent[rank] = (dict(), 0) 
+            if rank not in parent:
+                parent[rank] = (dict(), 0)
 
-            parent[rank] = (parent[rank][0], parent[rank][1] + passTaxaEntries[taxon])
+            parent[rank] = (parent[rank][0], parent[rank][1] + taxa_entries[taxon])
             parent = parent[rank][0]
 
-    return retTree
+    return ret_tree
 
-# Find a specific rank instance subtree within a lineage tree
-def findRankSubtree(passLineage, passRank):
+
+def find_rank_subtree(lineage, rank):
+    """ Find a specific rank instance subtree within a lineage tree """
     # Breadth-wise search
-    for rank in passLineage[0]:
-        if rank == passRank: return passLineage[0][rank]
+    for rank in lineage[0]:
+        if rank == rank:
+            return lineage[0][rank]
 
     # Recurse if necessary
-    for rank in passLineage[0]:
-        retTree = findRankSubtree(passLineage[0][rank], passRank)
-        if retTree: return retTree
+    for rank in lineage[0]:
+        ret_tree = find_rank_subtree(lineage[0][rank], rank)
+        if ret_tree:
+            return ret_tree
 
-# Get immediate children for a specific lineage rank branch
-def getTreeChildren(passLineage):
-    retChildren = dict()
-    retCount = 0
 
-    for rank in passLineage[0]:
-        count = passLineage[0][rank][1]
-        retChildren[rank] = count
-        retCount += count
+def get_tree_children(lineage):
+    """ Get immediate children for a specific lineage rank branch """
+    ret_children = dict()
+    ret_count = 0
 
-    return retChildren, retCount
+    for rank in lineage[0]:
+        count = lineage[0][rank][1]
+        ret_children[rank] = count
+        ret_count += count
 
-# Flatten a lineage tree to a specific level
-def flattenTree(passLineage, passLevel):
-    retFlatEntries = dict()
-    retFlatCount = 0
+    return ret_children, ret_count
+
+
+def flatten_tree(lineage, level):
+    """ Flatten a lineage tree to a specific level """
+    ret_flat_entries = dict()
+    ret_flat_count = 0
 
     # Negative level indicates last level
-    if passLevel < 0:
-        for entry in passLineage[0]:
-            if not passLineage[0][entry][0]:
-                retFlatEntries[entry] = passLineage[0][entry][1]
-                retFlatCount += passLineage[0][entry][1]
+    if level < 0:
+        for entry in lineage[0]:
+            if not lineage[0][entry][0]:
+                ret_flat_entries[entry] = lineage[0][entry][1]
+                ret_flat_count += lineage[0][entry][1]
 
-    if passLevel == 0:
+    if level == 0:
         # At level 0, extract lineage
-        retFlatEntries, retFlatCount = getTreeChildren(passLineage)
+        ret_flat_entries, ret_flat_count = get_tree_children(lineage)
     else:
         # At higher levels, recurse and append
-        for entry in passLineage[0]:
-            subtreeEntries, subtreeCount = flattenTree(passLineage[0][entry], passLevel - 1)
-            retFlatEntries.update(subtreeEntries)
-            retFlatCount += subtreeCount
+        for entry in lineage[0]:
+            subtree_entries, subtree_count = flatten_tree(lineage[0][entry], level - 1)
+            ret_flat_entries.update(subtree_entries)
+            ret_flat_count += subtree_count
 
-    return retFlatEntries, retFlatCount
-    
-# Render standard dictionary abundance report
-def renderAbundance(passData, passHeader, passTotal):
+    return ret_flat_entries, ret_flat_count
+
+
+def render_abundance(data, header, total):
+    """ Render standard dictionary abundance report """
     # Sort entries
-    sortedData = sorted(passData.items(), key = operator.itemgetter(1), reverse=True)
+    sorted_data = sorted(data.items(), key=operator.itemgetter(1), reverse=True)
 
     # Render data
-    plugins.core.sendOutput(passHeader)
+    core.main.send_output(header)
 
-    for row in sortedData:
-        abundance = row[1] / passTotal * 100
-        outputLine = "{0}\t{1}\t{2}".format(row[1], abundance, row[0])
-        plugins.core.sendOutput(outputLine)
+    for row in sorted_data:
+        abundance = row[1] / total * 100
+        output_line = "{0}\t{1}\t{2}".format(row[1], abundance, row[0])
+        core.main.send_output(output_line)
 
-# Group SAM reads per taxonomic rank
-def groupSam(passData, passSam, passSpecies):
+
+def group_sam(data, sam_file, species):
+    """ Group SAM reads per taxonomic rank """
     retData = dict()
 
     # Simplify species lookup keys
-    speciesLookup = {item[0]: item[1] for item in passSpecies}
+    species_lookup = {item[0]: item[1] for item in species}
 
     # Read SAM entries
-    samEntries = plugins.core.SamEntry.getEntries(passSam, 0)
+    entries = SamEntry.get_entries(sam_file, 0)
 
-    for entry in samEntries:
-        reference = samEntries[entry].reference
-        
+    for entry in entries:
+        reference = entries[entry].reference
+
         # Currently only handles UniProt
-        if not '_' in reference: continue
+        if "_" not in reference:
+            continue
 
-        mnemonic = reference.split('_')[1]
+        mnemonic = reference.split("_")[1]
 
         # Skip entries that are too ambiguous (e.g. 9ZZZZ) or recently moved by UniProt
-        if not mnemonic in lineageLookup: continue
-        if not mnemonic in speciesLookup: continue
+        if mnemonic not in species_lookup:
+            continue
+
+        result = DataStore.get_entry("taxonomy").exec_query("lineage-lookup", [mnemonic]).fetchone()
+        if not result:
+            continue
 
         # Combine lineage and species for lookup into taxonomy results
-        lineage = [item.strip() for item in lineageLookup[mnemonic].split(';')]
-        lineage.append(speciesLookup[mnemonic])
+        lineage = [item.strip() for item in result[0].split(";")]
+        lineage.append(species_lookup[mnemonic])
 
         for rank in lineage:
-            if rank in passData:
-                query = samEntries[entry].query
-                if not query in retData: retData[query] = list()
+            if rank in data:
+                query = entries[entry].query
+                if query not in retData:
+                    retData[query] = list()
                 retData[query].append(rank)
 
     return retData
 
-# Render SAM reads per taxonomic rank
-def renderSam(passData):
-    plugins.core.sendOutput("Read\tTaxonomy")
 
-    for read in passData:
-        for rank in passData[read]:
-            outputLine = "{0}\t{1}".format(read, rank)
-            plugins.core.sendOutput(outputLine)
+def render_sam(data):
+    """ Render SAM reads per taxonomic rank """
+    core.main.send_output("Read\tTaxonomy")
+
+    for read in data:
+        for rank in data[read]:
+            output_line = "{0}\t{1}".format(read, rank)
+            core.main.send_output(output_line)
