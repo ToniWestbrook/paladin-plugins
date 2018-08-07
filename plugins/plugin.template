@@ -26,8 +26,8 @@ import shlex
 import core.main
 
 
-# Plugin connection definition
 def plugin_connect(definition):
+    """ Plugin definition """
     definition.name = "pluginName"  # Plugin name shown in plugin list (should match filename so user knows what to type eg @@pluginName)
     definition.description = "Plugin Description"  # Plugin description shown in  plugin list
     definition.version_major = 1  # Plugin version shown in plugin list
