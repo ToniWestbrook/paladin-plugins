@@ -4,14 +4,21 @@
 PALADIN plugin template.
 
 All output (both stdout and stderr) must be routed through
-the "core.main.sendOutput" method.  Initialization and main program body should be stored
-within the initialization and main callbacks, respectively (see below).
+the "core.main.send_output" method.  Argument parsing, initialization, and
+main program body must be registered as callbacks (initialization is optional)
+as shown below.  Argument parsing will be called prior to initialization, to allow
+usage to be displayed prior to the plugin running any time consuming operations.
 
-core.main.PaladinEntry.getEntries can be used for getting UniProt report data
-core.main.SamEntry.getEntries can be used for getting SAM data
+core.main.PaladinEntry.get_entries can be used for getting UniProt report data
+core.main.SamEntry.get_entries can be used for getting SAM data
+core.filestore.FileStore provides file and download management
+core.datastore.DataStore provides sqlite connectivity
+The crossref module provides common ID lookups
 
-See core.py for other API methods.  When calling methods from other plugins, be sure to list
-them as dependencies in the plugin definition.  Do not list core as a dependency.
+See core and plugins for other API methods.  When calling methods from other plugins,
+be sure to list them as dependencies in the plugin definition.
+
+Core modules must be included using Python import, while plugins must not.
 """
 
 import argparse
@@ -28,14 +35,13 @@ def plugin_connect(definition):
     definition.version_revision = 0
     definition.dependencies = ['aggregation']  # If plugin depends on other plugins, specify their plugin name here
 
-    definition.callback_args = template_args  # Reference plugin argument parsing method here.  Will receive plugin arguments string.  Requird.
-    # definition.callback_init = template_init # Reference plugin initialization method here (run once at startup).  Not required.
+    definition.callback_args = template_args  # Reference plugin argument parsing method here.  Will receive plugin arguments string.  Required.
+    # definition.callback_init = template_init # Reference plugin initialization method here (run once at startup after arg parsing).  Not required.
     definition.callback_main = template_main  # Reference plugin main method here.  Will receive plugin arguments.  Required.
 
 
-# Plugin arg parsing
 def template_args(subargs):
-    # Parse arguments
+    """ Parse arguments """
     arg_parser = argparse.ArgumentParser(description='PALADIN Pipeline Plugins: Your plugin', prog='your plugin')
     arg_parser.add_argument('-a', metavar='ARG1', type=str, help='Arg 1')
     arg_parser.add_argument('-b', metavar='ARG2', type=int, required=True, help='Arg 2')
@@ -43,6 +49,6 @@ def template_args(subargs):
     return arg_parser.parse_known_args(shlex.split(subargs))
 
 
-# Plugin main
 def template_main(args):
-    core.main.sendOutput('Unimplemented', 'stderr')
+    """ Main program """
+    core.main.send_output('Unimplemented', 'stderr')
