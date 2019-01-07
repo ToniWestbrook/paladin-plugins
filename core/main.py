@@ -182,6 +182,7 @@ class PaladinEntry:
         self.quality_max = 0
         self.species_id = "Unknown"
         self.species_full = "Unknown"
+        self.protein = "Unknown"
         self.ontology = list()
 
     @staticmethod
@@ -225,6 +226,7 @@ class PaladinEntry:
                     entry.species_id = entry.kb.split("_")[1]
                     entry.species_full = fields[PaladinEntry.FIELD_SPECIES]
                     entry.id = fields[PaladinEntry.FIELD_ID]
+                    entry.protein = fields[PaladinEntry.FIELD_PROTEIN]
                     entry.ontology = [term.strip() for term in fields[PaladinEntry.FIELD_ONTOLOGY].split(";")]
                 else:
                     # Check for custom match
@@ -369,7 +371,8 @@ def render_output(filename="", target="stdout"):
         del output_stderr[:]
 
     if not filename:
-        print(render_text, flush=True)
+        std_target = sys.stdout if target == "stdout" else sys.stderr
+        print(render_text, flush=True, file=std_target)
     else:
         with open(filename, "w") as handle:
             handle.write(render_text)
@@ -377,22 +380,18 @@ def render_output(filename="", target="stdout"):
 
 def send_output(output_text, target="stdout", suffix="\n"):
     """ API - Record output into the appropriate buffer """
-    newContent = "{0}{1}".format(output_text, suffix)
+    new_content = "{0}{1}".format(output_text, suffix)
 
-    # Check if output should be buffered or set to console
-    console = False
-    if target == "stdout" and console_stdout:
-        console = True
-    if target == "stderr" and console_stderr:
-        console = True
-
-    if console:
-        print(newContent, end="", flush=True)
+    if target == "stdout":
+        if console_stdout:
+            print(new_content, end="", flush=True)
+        else:
+            output_stdout.append(new_content)
     else:
-        if target == "stdout":
-            output_stdout.append(newContent)
-        if target == "stderr":
-            output_stderr.append(newContent)
+        if console_stderr:
+            print(new_content, end="", flush=True, file=sys.stderr)
+        else:
+            output_stderr.append(new_content)
 
 
 def getInteger(val):
