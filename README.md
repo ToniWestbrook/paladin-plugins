@@ -9,6 +9,7 @@ PALADIN-plugins can be chained in a pipeline configuration using a single or mul
 - Difference: Analyze relative differences between two PALADIN taxonomy reports.  Can also report specific contributing reads for each difference
 - GO: Perform gene ontology term grouping and abundance reporting
 - HPC: Distribute PALADIN execution across cluster nodes
+- Pathways: Perform metabolic pathway participation reporting
 - Plotting: Generate plots in PNG format from pipeline generated data (this feature is currently alpha)
 - Taxonomy: Perform taxonomic grouping and abundance reporting
 - Uniprot: Download custom UniProt reports for a PALADIN prepared SAM alignment
@@ -49,6 +50,16 @@ paladin-plugins.py @@aggregation -r /path/subdir -s outfile\.sam -o combined
 Group GO terms and write abundances to a file, filtering for a mapping quality of 20
 ```
 paladin-plugins.py @@go -i input.tsv -q 20 @@write output.txt
+```
+
+Report the metabolic pathway participation across all phyla for all detected pathways
+```
+paladin-plugins.py @@pathways -i input.tsv -q 20 -l 2
+```
+
+Report the enzyme counts for all firmicutes in the Streptomycin biosynthesis pathway  (ec00521)
+```
+paladin-plugins.py @@pathways -i input.tsv -q 20 -s Firmicutes -p ec00521
 ```
 
 Group all bacterial species and write abundances to a file, then plot data to a pie chart, filtering for a mapping quality of 30 and limited number of values shown on graph to 10
