@@ -24,6 +24,7 @@ class DataStore:
         self.queries = dict()
         self.indices = dict()
         self.connection = sqlite3.connect(filename)
+        self.connection.isolation_level = None
         self.transaction = False
 
         # Create age table (if applicable)
