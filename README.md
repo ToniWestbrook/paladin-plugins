@@ -40,7 +40,7 @@ paladin-plugins.py -l
 
 Run PALADIN on all fastq (fq) files in a subdirectory that have "R1" in the filename using 16 threads, placing the output in each subdirectory:
 ```
-paladin-plugins.py @@automate reference.fasta.gz /path/subdir .*R1.*\.fq.gz -t 16 -o outfile
+paladin-plugins.py @@automate reference.fasta.gz /path/subdir .*R1.*\.fq.gz -t 16
 ```
 Combine the SAM and TSV outputs of the multiple PALADIN runs above into a single output
 ```
