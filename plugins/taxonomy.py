@@ -42,7 +42,7 @@ def plugin_connect(definition):
     definition.description = "Perform taxonomic grouping and abundance reporting"
     definition.version_major = 1
     definition.version_minor = 1
-    definition.version_revision = 2
+    definition.version_revision = 3
 
     definition.callback_args = taxonomy_args
     definition.callback_init = taxonomy_init
@@ -67,7 +67,7 @@ def taxonomy_args(sub_args):
 def taxonomy_init():
     # Setup FileStore
     FileStore("taxonomy-db", "taxonomy-db", "taxonomy.db", None, FileStore.FTYPE_CACHE, FileStore.FOPT_NORMAL)
-    FileStore("taxonomy-lineage", "taxonomy-lineage", "taxonomy-lineage.dat", "http://www.uniprot.org/taxonomy/?query=&sort=score&format=tab", FileStore.FTYPE_TEMP, FileStore.FOPT_NORMAL)
+    FileStore("taxonomy-lineage", "taxonomy-lineage", "taxonomy-lineage.dat", "https://rest.uniprot.org/taxonomy/stream?fields=id%2Cmnemonic%2Clineage&format=tsv&query=%28%2A%29", FileStore.FTYPE_TEMP, FileStore.FOPT_NORMAL)
 
     # Setup DataStore
     DataStore("taxonomy", FileStore.get_entry("taxonomy-db").path)
@@ -139,11 +139,11 @@ def populate_database():
     with entry.get_handle("r") as handle:
         for line in handle:
             fields = line.rstrip().split("\t")
-            if len(fields) < 9 or fields[1] == "":
+            if len(fields) < 3 or fields[1] == "":
                 continue
 
             # Add to database
-            DataStore.get_entry("taxonomy").insert_rows("lineage", [(fields[1], fields[8])])
+            DataStore.get_entry("taxonomy").insert_rows("lineage", [(fields[1], fields[2])])
 
     # Finalize transaction and current table age
     DataStore.get_entry("taxonomy").process_trans()
