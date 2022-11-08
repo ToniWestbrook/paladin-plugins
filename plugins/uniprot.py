@@ -30,13 +30,14 @@ import argparse
 import shlex
 import requests
 import sys
+import time
 import core.main
 
-UNIPROT_TEMPLATE_INIT = "https://www.uniprot.org/uploadlists/"
-UNIPROT_TEMPLATE_JOB = "https://www.uniprot.org/jobs/{0}.stat"
-UNIPROT_TEMPLATE_RESULTS = "https://www.uniprot.org/uniprot/?query=job:{0}&format=tab&columns={1}"
-UNIPROT_REQUIRED = ["entry%20name", "id"]
-UNIPROT_COLUMNS = ["organism", "protein%20names", "genes", "pathway", "features", "go", "reviewed", "existence", "comments", "database(KEGG)", "database(GeneID)", "database(PATRIC)", "database(EnsemblBacteria)"]
+UNIPROT_TEMPLATE_INIT = "https://rest.uniprot.org/idmapping/run"
+UNIPROT_TEMPLATE_JOB = "https://rest.uniprot.org/idmapping/status/{0}"
+UNIPROT_TEMPLATE_RESULTS = "https://rest.uniprot.org/idmapping/uniprotkb/results/stream/{0}?format=tsv&fields={1}"
+UNIPROT_REQUIRED = ["accession"]
+UNIPROT_COLUMNS = ["organism_name", "protein_name", "gene_names", "cc_pathway", "feature_count", "go", "reviewed", "protein_existence", "cc_function", "xref_kegg", "xref_geneid", "xref_patric", "xref_ensemblbacteria", "organism_id", "lineage"]
 
 
 def plugin_connect(definition):
@@ -44,7 +45,7 @@ def plugin_connect(definition):
     definition.description = "Download custom UniProt reports"
     definition.version_major = 1
     definition.version_minor = 0
-    definition.version_revision = 1
+    definition.version_revision = 2
     definition.dependencies = []
 
     definition.callback_args = uniprot_args
@@ -76,8 +77,7 @@ def uniprot_main(args):
     joined_data = join_data(sam_data, sam_total, uniprot_data)
 
     # Sort and render report
-    print(uniprot_data)
-    headers = "Count\tAbundance\tQuality (Average)\tQuality (Max)\tUniProtKB\tID\t{0}".format("\t".join(uniprot_data["Entry name"][2:]))
+    headers = "Count\tAbundance\tQuality (Average)\tQuality (Max)\tUniProtKB\tID\t{0}".format("\t".join(uniprot_data["From"][2:]))
     join_sorted = sorted(joined_data, reverse=True)
     render_report(join_sorted, headers)
 
@@ -130,11 +130,9 @@ def retrieve_data(entries, columns, batch, max_retry):
 
         # Construct POST data
         post_data = dict()
-        post_data["uploadQuery"] = batch_entries[:-1]
-        post_data["format"] = "job"
-        post_data["from"] = "ACC+ID"
-        post_data["to"] = "ACC"
-        post_data["landingPage"] = "false"
+        post_data["ids"] = batch_entries[:-1]
+        post_data["from"] = "UniProtKB_AC-ID"
+        post_data["to"] = "UniProtKB"
 
         # Submit batch query, retrieve job ID
         retry = 0
@@ -148,25 +146,31 @@ def retrieve_data(entries, columns, batch, max_retry):
                 core.main.send_output("Fetching entries {0}:{1} of {2}...".format(batch_idx, end_batch, len(entries)), "stderr")
 
                 response = requests.post(UNIPROT_TEMPLATE_INIT, post_data)
-                job_id = response.text
+                job_json = response.text
                 response.close()
 
                 # Check for valid job ID
-                if any(x in job_id for x in ["<", " "]):
+                if not job_json.startswith('{"jobId":'):
                     raise Exception
+
+                job_id = job_json.split(":")[1][1:-2]
 
                 # Monitor if job has completed
                 url = UNIPROT_TEMPLATE_JOB.format(job_id)
                 job_complete = ""
 
-                while job_complete != "COMPLETED":
-                    response = requests.post(url)
-                    job_complete = response.text
+                while True:
+                    response = requests.get(url, allow_redirects=False)
+                    job_status = response.text
                     response.close()
+                    if '{"jobStatus":"FINISHED"}' in job_status:
+                        break
+
+                    time.sleep(5)
 
                 # Fetch data and breakout text
                 url = UNIPROT_TEMPLATE_RESULTS.format(job_id, ",".join(columns))
-                response = requests.post(url)
+                response = requests.get(url)
 
                 for line in response.text.split("\n"):
                     line = line.rstrip()
