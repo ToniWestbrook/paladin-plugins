@@ -72,7 +72,7 @@ class DataStore:
         """ Insert rows given a list of tuples """
         cursor = self.connection.cursor()
         param_tokens = ("?," * len(data[0]))[:-1]
-        cursor.executemany("INSERT INTO {0} VALUES ({1})".format(name, param_tokens), data)
+        cursor.executemany("INSERT OR IGNORE INTO {0} VALUES ({1})".format(name, param_tokens), data)
 
         if not self.transaction:
             self.connection.commit()
